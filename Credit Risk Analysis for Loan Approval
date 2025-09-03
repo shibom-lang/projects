@@ -1,0 +1,188 @@
+Credit Risk Analysis for Loan Approval
+## Objective
+Analyze loan applicant data to assess credit risk and build a model to predict loan approval.
+## Dataset Overview
+The dataset contains information about loan applicants including their demographics, credit history, loan amount, income, and loan approval status.
+## Workflow
+1. Load and explore the dataset
+2. Preprocess the data
+3. Perform EDA to understand key risk indicators
+4. Build a classification model
+5. Evaluate model performance
+# Import necessary libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import balanced_accuracy_score
+from sklearn.metrics import (
+    classification_report,
+    accuracy_score,
+    confusion_matrix,
+    balanced_accuracy_score,
+    roc_auc_score
+)
+
+# Load the dataset
+df = pd.read_csv('loan_data.csv')
+print("Dataset Shape:", df.shape)
+print("\nFirst 6 rows:")
+df.head()
+
+# Basic dataset information
+print("Dataset Info:")
+print(df.info())
+print("\nDataset Description:")
+print(df.describe())
+print("\nColumn Names:")
+print(df.columns.tolist())
+
+## Data Preprocessing
+print("Missing Values:")
+print(df.isnull().sum())
+print(f"\nTotal missing values: {df.isnull().sum().sum()}")
+# Check data types
+print("\nData Types:")
+print(df.dtypes)
+
+# Drop rows with missing values or handle them accordingly
+df_clean = df.copy()
+
+# Convert categorical columns to numeric using Label Encoding
+df_clean = df.copy()
+from sklearn.preprocessing import LabelEncoder
+
+# Only add if column is missing
+if 'Loan_Status_Encoded' not in df.columns:
+    df['Loan_Status_Encoded'] = LabelEncoder().fit_transform(df['loan_status'])
+    
+print(df[['loan_status', 'Loan_Status_Encoded']].head())
+
+# Optional: Scale numerical features
+scaler = StandardScaler()
+numerical_features = ['credit_score', 'income', 'loan_amount', 'debt_to_income', 'employment_length']
+
+print(f"\nFeatures to be scaled: {numerical_features}")
+print(f"Target variable: Loan_Status_Encoded")
+
+## Exploratory Data Analysis (EDA)
+
+# Visualize target distribution
+plt.figure(figsize=(15, 5))
+
+plt.subplot(1, 3, 1)
+df_clean['loan_status'].value_counts().plot(kind='bar', color=['lightcoral', 'lightblue'])
+plt.title('Loan Status Distribution')
+plt.xlabel('Loan Status')
+plt.ylabel('Count')
+plt.xticks(rotation=0)
+
+plt.subplot(1, 3, 2)
+df_clean['loan_status'].value_counts().plot(kind='pie', autopct='%1.1f%%', colors=['lightcoral', 'lightblue'])
+plt.title('Loan Status Distribution (%)')
+plt.ylabel('')
+
+plt.subplot(1, 3, 3)
+
+# Correlation heatmap
+plt.figure(figsize=(10, 8))
+correlation_matrix = df_clean[numerical_features + ['Loan_Status_Encoded']].corr()
+sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', center=0, 
+            square=True, linewidths=0.5, cbar_kws={"shrink": .8})
+plt.title('Correlation Matrix of Loan Features')
+plt.tight_layout()
+plt.show()
+
+print("Correlation with Loan Approval:")
+correlations = correlation_matrix['Loan_Status_Encoded'].sort_values(ascending=False)
+for feature, corr in correlations.items():
+    if feature != 'Loan_Status_Encoded':
+        print(f"{feature}: {corr:.3f}")
+        
+# Feature distributions by loan status
+fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+fig.suptitle('Feature Distributions by Loan Status', fontsize=16)
+
+for i, feature in enumerate(numerical_features):
+    row = i // 3
+    col = i % 3
+    
+    # Box plot
+    sns.boxplot(data=df_clean, x='loan_status', y=feature, ax=axes[row, col])
+    axes[row, col].set_title(f'{feature} by Loan Status')
+    axes[row, col].tick_params(axis='x', rotation=45)
+
+# Remove empty subplot
+axes[1, 2].remove()
+
+plt.tight_layout()
+plt.show()
+## Model Training and Evaluation
+# Define features and target
+X = df_clean[numerical_features]
+y = df_clean['Loan_Status_Encoded']
+
+print("Features (X):")
+print(X.head())
+print(f"\nFeature shape: {X.shape}")
+print(f"Target shape: {y.shape}")
+print(f"\nTarget distribution:")
+print(y.value_counts())
+# Split data
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+print(f"Training set shape: {X_train.shape}")
+print(f"Test set shape: {X_test.shape}")
+print(f"Training target distribution:")
+print(y_train.value_counts())
+print(f"Test target distribution:")
+print(y_test.value_counts())
+
+# Scale features for logistic regression
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+# Train logistic regression model
+logreg = LogisticRegression(max_iter=1000)
+logreg.fit(X_train_scaled, y_train)
+y_pred_lr = logreg.predict(X_test_scaled)
+y_proba_lr = logreg.predict_proba(X_test_scaled)[:,1]
+
+# Train Random Forest model (doesn't need scaling)
+rf_model = RandomForestClassifier(n_estimators=200, max_depth=10, random_state=42)
+rf_model.fit(X_train, y_train)
+
+print("Models trained successfully!")
+
+# Predictions
+rf_pred = rf_model.predict(X_test)
+rf_pred_proba = rf_model.predict_proba(X_test)[:, 1]
+
+print("Random Forest predictions completed!")
+
+
+# Evaluation
+def evaluate(y_true, y_pred, y_proba, model_name):
+    print(f"\n=== {model_name} ===")
+    print("Accuracy:          ", accuracy_score(y_true, y_pred))
+    print("Balanced Accuracy: ", balanced_accuracy_score(y_true, y_pred))
+    print("ROC-AUC:           ", roc_auc_score(y_true, y_proba))
+    print(classification_report(y_true, y_pred, target_names=['Denied', 'Approved']))
+
+    cm = confusion_matrix(y_true, y_pred)
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+    plt.title(f"{model_name} Confusion Matrix")
+    plt.xlabel("Predicted"); plt.ylabel("Actual")
+    plt.show()
+
+print("LOGISTIC REGRESSION RESULTS:")
+evaluate(y_test, y_pred_lr, y_proba_lr, "Logistic Regression")
+print("RANDOM FOREST RESULTS:")
+evaluate(y_test, y_pred_rf, y_proba_rf, "Random Forest")
+    
+
